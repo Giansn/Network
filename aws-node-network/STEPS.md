@@ -164,7 +164,7 @@ aws ssm start-session --region eu-central-1 --target i-xxxxxxxxxxxxxxxxx
 
 The repo’s [`edge_npu_infer/run_npu.py`](https://github.com/Giansn/Network/blob/main/edge_npu_infer/run_npu.py) is a tiny neural graph. On EC2 there is **no Intel Core Ultra NPU** on typical types — use **`CPU`** (default). **`GPU`** only if you launched a GPU instance and installed drivers.
 
-The helper installs `python3-pip`, creates a venv under `/opt/delegated-network/run/edge-infer`, `pip install openvino`, downloads `run_npu.py` from **GitHub raw**, then runs it. **Outbound HTTPS** to GitHub and PyPI is required (NAT or egress from the private subnet).
+The helper detects **Ubuntu/Debian** (`apt-get`, `python3-venv`) or **Amazon Linux / RHEL** (`dnf` / `yum`), creates a venv under `/opt/delegated-network/run/edge-infer`, `pip install openvino`, downloads `run_npu.py` from **GitHub raw**, then runs it. **Outbound HTTPS** to GitHub and PyPI is required (NAT or egress from the private subnet). First run may take several minutes (package + wheel download).
 
 ```powershell
 .\scripts\Invoke-SsmRunEdgeInfer.ps1 `
