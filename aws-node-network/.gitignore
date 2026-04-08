@@ -1,0 +1,7 @@
+my-params.json
+vpn-certs-work/
+*.ovpn
+*.pem
+*.key
+*.crt
+*.csr

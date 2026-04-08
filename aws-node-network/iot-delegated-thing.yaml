@@ -1,0 +1,52 @@
+# Companion template: logical IoT identity for a delegated edge node (no VPC).
+# After deploy: create/register device certs in IoT console or CLI, attach policy, attach thing.
+AWSTemplateFormatVersion: "2010-09-09"
+Description: IoT thing + restrictive policy template for MQTT-based delegated nodes.
+
+Parameters:
+  ThingName:
+    Type: String
+    Description: Unique thing name (e.g. laptop-npu-01).
+
+Resources:
+  DelegatedNodePolicy:
+    Type: AWS::IoT::Policy
+    Properties:
+      PolicyName: !Sub "${ThingName}-delegated-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - iot:Connect
+            Resource:
+              - !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:client/${ThingName}"
+          - Effect: Allow
+            Action:
+              - iot:Publish
+              - iot:Receive
+            Resource:
+              - !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topic/nodes/${ThingName}/*"
+              - !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topic/cmd/${ThingName}/*"
+          - Effect: Allow
+            Action:
+              - iot:Subscribe
+            Resource:
+              - !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topicfilter/nodes/${ThingName}/*"
+              - !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topicfilter/cmd/${ThingName}/*"
+
+  DelegatedThing:
+    Type: AWS::IoT::Thing
+    Properties:
+      ThingName: !Ref ThingName
+      AttributePayload:
+        Attributes:
+          role: delegated-node
+
+Outputs:
+  ThingName:
+    Value: !Ref ThingName
+  PolicyName:
+    Value: !Ref DelegatedNodePolicy
+  NextStep:
+    Value: "Register a device certificate, attach-policy to cert, attach-thing-principal, use IoT endpoint from describe-endpoint."

@@ -1,0 +1,341 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Private VPC for delegated edge/agent nodes: public tier (NAT + Client VPN association),
+  private tier (nodes). Client VPN mutual TLS for private RFC1918 access from laptops.
+  Includes IAM instance profile for SSM (no inbound SSH from internet required).
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: node-net
+    Description: Prefix for resource names.
+
+  VpcCidr:
+    Type: String
+    Default: 10.42.0.0/16
+    AllowedPattern: '^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\/(1[6-9]|2[0-8])$'
+    Description: >
+      VPC IPv4 CIDR (/16-/28). Subnets use the first four /24 slices from this block via Fn::Cidr(..., 4, 8).
+
+  ClientVpnClientCidrBlock:
+    Type: String
+    Default: 10.100.0.0/22
+    Description: >
+      VPN client address pool (/22–/12). Must NOT overlap VpcCidr or on-prem routes.
+
+  ServerCertificateArn:
+    Type: String
+    Description: >
+      ACM ARN for the Client VPN server certificate (same Region as this stack).
+
+  ClientRootCertificateChainArn:
+    Type: String
+    Description: >
+      ACM ARN for the client CA chain (mutual TLS).
+
+  EnableInternetRouteForClients:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+    Description: >
+      If true, adds 0.0.0.0/0 on the Client VPN endpoint (full tunnel via VPC/NAT).
+
+Conditions:
+  FullTunnelClients: !Equals [!Ref EnableInternetRouteForClients, "true"]
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: VPN certificates (ACM, same Region)
+        Parameters:
+          - ServerCertificateArn
+          - ClientRootCertificateChainArn
+      - Label:
+          default: Network
+        Parameters:
+          - EnvironmentName
+          - VpcCidr
+          - ClientVpnClientCidrBlock
+          - EnableInternetRouteForClients
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-vpc"
+
+  Igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-igw"
+
+  IgwAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref Igw
+      VpcId: !Ref Vpc
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 4, 8]]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-public-a"
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 4, 8]]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-public-b"
+
+  PrivateSubnetNodeA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, 4, 8]]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-private-nodes-a"
+
+  PrivateSubnetNodeB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, 4, 8]]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-private-nodes-b"
+
+  NatEip:
+    Type: AWS::EC2::EIP
+    DependsOn: IgwAttachment
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-nat-eip"
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEip.AllocationId
+      SubnetId: !Ref PublicSubnetA
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-nat"
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-public-rt"
+
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IgwAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Igw
+
+  PublicSubnetARouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetA
+
+  PublicSubnetBRouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetB
+
+  PrivateNodeRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-private-nodes-rt"
+
+  PrivateNodeDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateNodeRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  PrivateNodeSubnetARouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateNodeRouteTable
+      SubnetId: !Ref PrivateSubnetNodeA
+
+  PrivateNodeSubnetBRouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateNodeRouteTable
+      SubnetId: !Ref PrivateSubnetNodeB
+
+  ClientVpnIngressSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Ingress to Client VPN endpoint ENIs
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: udp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: Client VPN (UDP 443)
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-clientvpn-sg"
+
+  DelegatedNodeSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Delegated private node tier - tighten per workload
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref ClientVpnIngressSg
+          Description: SSH only from VPN path (prefer SSM)
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref ClientVpnIngressSg
+          Description: HTTPS from VPN clients
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-delegated-node-sg"
+
+  ClientVpnEndpoint:
+    Type: AWS::EC2::ClientVpnEndpoint
+    Properties:
+      AuthenticationOptions:
+        - Type: certificate-authentication
+          MutualAuthentication:
+            ClientRootCertificateChainArn: !Ref ClientRootCertificateChainArn
+      ClientCidrBlock: !Ref ClientVpnClientCidrBlock
+      ConnectionLogOptions:
+        Enabled: false
+      Description: !Sub "${EnvironmentName} mutual-TLS Client VPN"
+      DnsServers:
+        - AmazonProvidedDNS
+      ServerCertificateArn: !Ref ServerCertificateArn
+      SplitTunnel: true
+      TransportProtocol: udp
+      VpcId: !Ref Vpc
+      SecurityGroupIds:
+        - !Ref ClientVpnIngressSg
+      TagSpecifications:
+        - ResourceType: client-vpn-endpoint
+          Tags:
+            - Key: Name
+              Value: !Sub "${EnvironmentName}-cvpn"
+
+  ClientVpnAssocA:
+    Type: AWS::EC2::ClientVpnTargetNetworkAssociation
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVpnEndpoint
+      SubnetId: !Ref PublicSubnetA
+
+  ClientVpnVpcAuthRule:
+    Type: AWS::EC2::ClientVpnAuthorizationRule
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVpnEndpoint
+      TargetNetworkCidr: !Ref VpcCidr
+      AuthorizeAllGroups: true
+      Description: VPN clients may reach VPC CIDR
+
+  ClientVpnInternetRoute:
+    Type: AWS::EC2::ClientVpnRoute
+    Condition: FullTunnelClients
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVpnEndpoint
+      DestinationCidrBlock: 0.0.0.0/0
+      TargetVpcSubnetId: !Ref PublicSubnetA
+
+  ClientVpnInternetAuthRule:
+    Type: AWS::EC2::ClientVpnAuthorizationRule
+    Condition: FullTunnelClients
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVpnEndpoint
+      TargetNetworkCidr: 0.0.0.0/0
+      AuthorizeAllGroups: true
+      Description: Full-tunnel internet via VPC
+
+  DelegatedNodeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-delegated-node-role"
+
+  DelegatedNodeInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref DelegatedNodeRole
+
+Outputs:
+  VpcId:
+    Value: !Ref Vpc
+    Export:
+      Name: !Sub "${AWS::StackName}-VpcId"
+
+  PrivateNodeSubnetIds:
+    Value: !Join [",", [!Ref PrivateSubnetNodeA, !Ref PrivateSubnetNodeB]]
+    Description: Private delegated node subnets (ASG / EC2 / ECS tasks).
+
+  DelegatedNodeSecurityGroupId:
+    Value: !Ref DelegatedNodeSg
+
+  ClientVpnEndpointId:
+    Value: !Ref ClientVpnEndpoint
+
+  ExportClientConfigCommand:
+    Value: !Sub "aws ec2 export-client-vpn-client-configuration --client-vpn-endpoint-id ${ClientVpnEndpoint} --output text > ${EnvironmentName}.ovpn"
+    Description: Run after deploy; embed client cert/key per AWS Client VPN docs.
+
+  DelegatedNodeInstanceProfileArn:
+    Value: !GetAtt DelegatedNodeInstanceProfile.Arn
+    Description: Attach to EC2 / LT in private subnets for SSM (no public IP).

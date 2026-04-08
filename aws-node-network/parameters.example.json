@@ -1,0 +1,14 @@
+[
+  { "ParameterKey": "EnvironmentName", "ParameterValue": "node-net" },
+  { "ParameterKey": "VpcCidr", "ParameterValue": "10.42.0.0/16" },
+  { "ParameterKey": "ClientVpnClientCidrBlock", "ParameterValue": "10.100.0.0/22" },
+  {
+    "ParameterKey": "ServerCertificateArn",
+    "ParameterValue": "arn:aws:acm:REGION:ACCOUNT_ID:certificate/REPLACE_SERVER_CERT_ID"
+  },
+  {
+    "ParameterKey": "ClientRootCertificateChainArn",
+    "ParameterValue": "arn:aws:acm:REGION:ACCOUNT_ID:certificate/REPLACE_CLIENT_CA_CHAIN_ID"
+  },
+  { "ParameterKey": "EnableInternetRouteForClients", "ParameterValue": "false" }
+]
