@@ -7,6 +7,7 @@
 **/*.crt
 **/*.csr
 **/usage*.csv
+**/network-snapshot*.log
 .env
 **/__pycache__/
 **/*.pyc
