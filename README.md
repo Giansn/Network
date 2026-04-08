@@ -4,7 +4,7 @@ Monorepo for local edge/NPU tooling, AWS delegated VPC + Client VPN automation, 
 
 | Folder | Contents |
 |--------|----------|
-| [aws-node-network](aws-node-network/) | CloudFormation delegated VPC, Client VPN pipeline, EC2 bootstrap, TLS helpers |
+| [aws-node-network](aws-node-network/) | CloudFormation delegated VPC, Client VPN, EC2 bootstrap, TLS helpers, `scripts/Invoke-SsmRunEdgeInfer.ps1` (run `run_npu.py` on instance via SSM) |
 | [edge_npu_infer](edge_npu_infer/) | OpenVINO NPU bind, placement patterns, optional MCP server, `Invoke-OpenVinoEnv.ps1` |
 | [system-usage-tracker](system-usage-tracker/) | Low-overhead CPU/RAM CSV logger, optional scheduled task, `Get-NetworkSnapshot.ps1` |
 
