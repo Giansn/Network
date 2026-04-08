@@ -160,6 +160,21 @@ aws ssm start-session --region eu-central-1 --target i-xxxxxxxxxxxxxxxxx
 
 (Requires your user/role to allow SSM; instance must show **Online** under **Systems Manager** → **Fleet Manager**.)
 
+### Run the OpenVINO smoke model on the instance (SSM)
+
+The repo’s [`edge_npu_infer/run_npu.py`](https://github.com/Giansn/Network/blob/main/edge_npu_infer/run_npu.py) is a tiny neural graph. On EC2 there is **no Intel Core Ultra NPU** on typical types — use **`CPU`** (default). **`GPU`** only if you launched a GPU instance and installed drivers.
+
+The helper installs `python3-pip`, creates a venv under `/opt/delegated-network/run/edge-infer`, `pip install openvino`, downloads `run_npu.py` from **GitHub raw**, then runs it. **Outbound HTTPS** to GitHub and PyPI is required (NAT or egress from the private subnet).
+
+```powershell
+.\scripts\Invoke-SsmRunEdgeInfer.ps1 `
+  -Region eu-central-1 `
+  -InstanceId i-xxxxxxxx `
+  -Wait
+```
+
+Optional: `-Device GPU -Iterations 10`, or `-GitHubRef main` if you use a fork/branch.
+
 ---
 
 ## Phase F — Optional: IoT “logical node” stack
