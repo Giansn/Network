@@ -5,11 +5,11 @@ Cursor loads multiple MCP servers; the model in chat can call this server's tool
 and your other MCP tools (e.g. AWS Knowledge) in the same session. This process
 does not embed or call other MCP servers itself.
 
-Cursor MCP (example — merge into your mcp config):
+Cursor MCP (example — merge into your mcp config; use the absolute path to this file on your machine):
 
   "edge-npu": {
     "command": "python",
-    "args": ["C:\\\\Users\\\\giank\\\\Network\\\\network\\\\edge_npu_infer\\\\mcp_npu_server.py"]
+    "args": ["<PATH_TO_REPO>/network/edge_npu_infer/mcp_npu_server.py"]
   }
 """
 
