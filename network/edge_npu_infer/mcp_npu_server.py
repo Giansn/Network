@@ -9,7 +9,7 @@ Cursor MCP (example — merge into your mcp config):
 
   "edge-npu": {
     "command": "python",
-    "args": ["C:\\\\Users\\\\giank\\\\edge_npu_infer\\\\mcp_npu_server.py"]
+    "args": ["C:\\\\Users\\\\giank\\\\Network\\\\network\\\\edge_npu_infer\\\\mcp_npu_server.py"]
   }
 """
 

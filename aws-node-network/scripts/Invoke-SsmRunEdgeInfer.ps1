@@ -1,6 +1,6 @@
 #Requires -Version 5.1
 <#
-  Run edge_npu_infer/run_npu.py on an EC2 instance via SSM.
+  Run network/edge_npu_infer/run_npu.py on an EC2 instance via SSM.
 
   Supports **Ubuntu/Debian** (apt-get + python3-venv) and **Amazon Linux / RHEL family** (dnf or yum).
 
@@ -35,7 +35,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$rawUrl = "https://raw.githubusercontent.com/$RepoPath/$GitHubRef/edge_npu_infer/run_npu.py"
+$rawUrl = "https://raw.githubusercontent.com/$RepoPath/$GitHubRef/network/edge_npu_infer/run_npu.py"
 $root = "/opt/delegated-network/run/edge-infer"
 
 $bash = @'
