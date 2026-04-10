@@ -3,6 +3,7 @@ Placement patterns for edge neural nets (non-LLM): single NPU vs split across ne
 
 This module does not implement real sockets; wire `send_tensor` / `recv_tensor` to your
 MQTT/HTTPS/gRPC layer the same way Greengrass components pass tensors between stages.
+For a concrete bytes codec see `wire_tensor.py` (`pack_tensor` / `unpack_tensor`).
 
 AWS-aligned workflow: optimize + package the model in the cloud, ship IR (or runtime bundle)
 to devices, run inference locally with OpenVINO; multi-node = split at a narrow tensor
@@ -110,9 +111,23 @@ def describe_split_boundary(mid_shape: tuple[int, ...]) -> str:
 
 
 if __name__ == "__main__":
+    import sys
+
+    try:
+        from wire_tensor import make_wire_pair
+    except ImportError:
+        make_wire_pair = None  # type: ignore[misc, assignment]
+
     _core = ov.Core()
-    out_single = run_single_npu(_core, "NPU")
-    out_split = run_split_pipeline(_core, "NPU", "NPU")
-    print("single NPU output shape:", out_single.shape)
-    print("split (NPU to NPU, local transport) output shape:", out_split.shape)
+    dev = "NPU" if "NPU" in _core.available_devices else "CPU"
+    out_single = run_single_npu(_core, dev)
+    out_split = run_split_pipeline(_core, dev, dev)
+    print("single output shape:", out_single.shape, f"device={dev}")
+    print("split (local identity transport) output shape:", out_split.shape)
     print(describe_split_boundary((1, 16)))
+    if make_wire_pair:
+        s, r = make_wire_pair()
+        out_wire = run_split_pipeline(_core, dev, dev, send_tensor=s, recv_tensor=r)
+        print("split (wire_tensor codec) output shape:", out_wire.shape)
+        if out_wire.shape != out_split.shape:
+            print("warning: shape mismatch vs identity split", file=sys.stderr)

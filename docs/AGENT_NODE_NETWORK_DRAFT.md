@@ -2,7 +2,9 @@
 
 **Status:** Generic draft — not deployment-specific. Describes how to align **logical** split-inference stages with **physical** nodes (edge, gateway, cloud) and optional **agent** surfaces (bots, HTTP handlers) that consume bounded NN outputs without requiring an LLM API.
 
-**Code reference in this repo:** `network/edge_npu_infer/placement.py` (OpenVINO stages + transport hooks).
+**Operational setup (install, run, EC2 SSM, expand to IR):** [`NEURAL_NETWORK_SETUP.md`](NEURAL_NETWORK_SETUP.md) — *compare* this draft (topology / phases) with that doc (commands and artifacts).
+
+**Code reference in this repo:** `network/edge_npu_infer/placement.py` (OpenVINO stages + transport hooks), `network/edge_npu_infer/wire_tensor.py` (tensor bytes codec).
 
 ---
 

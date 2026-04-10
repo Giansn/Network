@@ -3,7 +3,7 @@
 ## Layout
 
 - **`aws-node-network/`** — CloudFormation (`template.yaml`), Client VPN TLS helpers, SSM scripts. Start from `STEPS.md`. Do not commit `my-params.json`, `*.ovpn`, or `vpn-certs-work/`.
-- **`network/edge_npu_infer/`** — OpenVINO NPU/CPU smoke (`run_npu.py`), `Invoke-OpenVinoEnv.ps1` (Windows), optional MCP server.
+- **`network/edge_npu_infer/`** — OpenVINO NPU/CPU smoke (`run_npu.py`), split placement (`placement.py`), tensor wire (`wire_tensor.py`), `Invoke-OpenVinoEnv.ps1` (Windows), optional MCP server. Ops guide: `docs/NEURAL_NETWORK_SETUP.md`.
 - **`system-usage-tracker/`** — Windows usage CSV + `Get-NetworkSnapshot.ps1`.
 
 ## Conventions
