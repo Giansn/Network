@@ -19,6 +19,21 @@ Use `-DryRun` to print steps only; `-SkipLaunchEc2` to stop after VPN export; `-
 
 Standalone: `.\scripts\New-ClientVpnTlsAssets.ps1` then `.\scripts\Add-ClientCertToOvpn.ps1`.
 
+### Linux / macOS (bash, no PowerShell)
+
+Same phases (ACM TLS in Phase B, then deploy). From this directory:
+
+```bash
+chmod +x deploy.sh scripts/export-vpn.sh
+cp parameters.example.json my-params.json
+# Edit my-params.json: set ServerCertificateArn, ClientRootCertificateChainArn, REGION placeholders.
+
+./deploy.sh eu-central-1 node-net-prod ./my-params.json
+./scripts/export-vpn.sh eu-central-1 node-net-prod ./node-net.ovpn
+```
+
+`deploy.sh` passes your JSON to `aws cloudformation deploy --parameter-overrides file://...` (same schema as `parameters.example.json`). OpenSSL/ACM steps are unchanged; use the [AWS Client VPN getting started](https://docs.aws.amazon.com/vpn/latest/clientvpn-admin/cvpn-getting-started.html) guide from any OS.
+
 ---
 
 ## Phase A — Prerequisites
